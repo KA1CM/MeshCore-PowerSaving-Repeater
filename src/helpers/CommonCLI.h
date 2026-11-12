@@ -32,6 +32,7 @@ public:
   float freq = 0;
   int8_t tx_power_dbm = 0;
   uint8_t disable_fwd = 0;
+  uint8_t disable_fwd_1byte = 1;  // custom repeater: block one-byte forwarding by default
   uint8_t advert_interval = 0;       // minutes / 2
   uint8_t flood_advert_interval = 0; // hours
   float rx_delay_base = 0;
@@ -196,6 +197,7 @@ private:
   protected:
     void structure() override {
       def("disable", _parent->disable_fwd);
+      def("disable_1byte", _parent->disable_fwd_1byte);
       def("f_max", _parent->flood_max);
       def("f_max_uns", _parent->flood_max_unscoped);
       def("f_max_adv", _parent->flood_max_advert);

@@ -433,6 +433,14 @@ void MyMesh::sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, ui
 
 bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
   if (_prefs.disable_fwd) return false;
+  if (_prefs.disable_fwd_1byte) {
+    // TRACE stores SNRs in path, and encodes its route hash width in payload flags.
+    if (packet->isRouteDirect() && packet->getPayloadType() == PAYLOAD_TYPE_TRACE) {
+      if (packet->payload_len < 9 || (packet->payload[8] & 0x03) == 0) return false;
+    } else if (packet->getPathHashSize() == 1) {
+      return false;
+    }
+  }
   if (packet->isRouteFlood()
       && mesh::isFloodHopLimitExceeded(packet, _prefs.flood_max, _prefs.flood_max_unscoped, _prefs.flood_max_advert)) {
     return false;
@@ -1260,8 +1268,19 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
     command += 3;
   }
 
-  // handle ACL related commands
-  if (memcmp(command, "setperm ", 8) == 0) {   // format:  setperm {pubkey-hex} {permissions-int8}
+  // Repeater-only CLI; remote callers use the existing admin permission gate.
+  if (strcmp(command, "get repeat.1byte") == 0) {
+    sprintf(reply, "> %s", _prefs.disable_fwd_1byte ? "off" : "on");
+  } else if (strncmp(command, "set repeat.1byte", 16) == 0
+             && (command[16] == 0 || command[16] == ' ')) {
+    if (strcmp(command, "set repeat.1byte on") == 0 || strcmp(command, "set repeat.1byte off") == 0) {
+      _prefs.disable_fwd_1byte = strcmp(command, "set repeat.1byte off") == 0;
+      savePrefs();
+      sprintf(reply, "OK - 1-byte forwarding is now %s", _prefs.disable_fwd_1byte ? "OFF" : "ON");
+    } else {
+      strcpy(reply, "Usage: set repeat.1byte on|off");
+    }
+  } else if (memcmp(command, "setperm ", 8) == 0) {   // format:  setperm {pubkey-hex} {permissions-int8}
     char* hex = &command[8];
     char* sp = strchr(hex, ' ');   // look for separator char
     if (sp == NULL) {
